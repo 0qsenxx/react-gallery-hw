@@ -1,4 +1,4 @@
-const Modal = ({ imgSrc, closeModal, closeModalByEsc }) => {
+const Modal = ({ imgSrc, closeModal }) => {
   const overlayClick = (evt) => {
     if (evt.target === evt.currentTarget) {
       closeModal();
