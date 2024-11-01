@@ -1,141 +1,123 @@
 import "./App.css";
-import { Component } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Searchbar from "./components/Searchbar/Searchbar";
 import ImageGallery from "./components/ImageGallery/ImageGallery";
 import Button from "./components/Button/Button";
 import Loader from "./components/Loader/Loader";
 import Modal from "./components/Modal/Modal";
 
-// let i = 0;
+const App = () => {
+  const [images, setImages] = useState([]);
+  const [inputValue, setInputValue] = useState("");
+  const [page, setPage] = useState(1);
+  const [modalImgSrc, setModalImgSrc] = useState("");
+  const [modalImgIdx, setModalImgIdx] = useState(0);
+  const [ableToLoadMore, setAbleToLoadMore] = useState(true);
+  // const [totalHits, setTotalHits] = useState(0);
+  const [nothingFound, setNothingFound] = useState(false);
+  // const [loading, setLoading] = useState(false);
 
-class App extends Component {
-  state = {
-    images: [],
-    inputValue: "",
-    page: 1,
-    modalImgSrc: "",
-    modalImgIdx: 0,
-    ableToLoadMore: true,
-    totalHits: 0,
-    nothingFound: false,
+  const getImagesByInput = (evt) => {
+    evt.preventDefault();
+    const newInputValue = evt.target.elements.searchbarInput.value.trim();
+    if (newInputValue !== inputValue) {
+      setInputValue(newInputValue);
+      setPage(1);
+      setImages([]);
+      setNothingFound(false);
+      setAbleToLoadMore(true);
+      // setLoading(true);
+    }
+    evt.target.reset();
   };
 
-  getImagesByInput = (evt) => {
-    evt.preventDefault();
-    const inputValue = evt.target.elements.searchbarInput.value;
-    this.setState({ page: 1, totalHits: 0 });
+  useEffect(() => {
+    if (!inputValue) return;
+
     fetch(
-      `https://pixabay.com/api/?q=${evt.target.elements.searchbarInput.value}&page=1&key=43032297-bb179a9d38920a1e0de24f77d&image_type=photo&orientation=horizontal&per_page=12`
+      `https://pixabay.com/api/?q=${inputValue}&page=${page}&key=43032297-bb179a9d38920a1e0de24f77d&image_type=photo&orientation=horizontal&per_page=12`
     )
       .then((res) => res.json())
       .then((data) => {
         if (data.hits.length === 0) {
-          this.setState({ nothingFound: true });
+          setNothingFound(true);
+        } else {
+          setNothingFound(false);
+          setImages((prevImages) => prevImages.concat(data.hits));
+          setAbleToLoadMore(data.hits.length < data.totalHits);
         }
-        this.setState({
-          images: data.hits,
-          inputValue,
-          totalHits: data.totalHits,
-          ableToLoadMore: data.hits.length < data.totalHits,
-        });
       });
-    evt.target.reset();
-  };
+  }, [inputValue, page]);
 
-  loadMoreFn = () => {
-    this.setState(
-      (prevState) => ({ page: prevState.page + 1 }),
-      () => {
-        fetch(
-          `https://pixabay.com/api/?q=${this.state.inputValue}&page=${this.state.page}&key=43032297-bb179a9d38920a1e0de24f77d&image_type=photo&orientation=horizontal&per_page=12`
-        )
-          .then((res) => res.json())
-          .then((data) => {
-            if (data.hits.length !== 0) {
-              this.setState((prevState) => ({
-                images: prevState.images.concat(data.hits),
-                ableToLoadMore:
-                  prevState.images.length + data.hits.length <
-                  this.state.totalHits,
-              }));
-            } else {
-              this.setState({ ableToLoadMore: false });
-            }
-          });
-      }
-    );
-  };
-
-  getImgSrcForModal = (evt) => {
-    const imgSrc = evt.target.src;
-    const modalImgIdx = this.state.images.findIndex(
-      (image) => image.largeImageURL === imgSrc
-    );
-    this.setState({ modalImgSrc: imgSrc, modalImgIdx });
-    window.addEventListener("keydown", this.switchKeys);
-  };
-
-  closeModal = () => {
-    this.setState({ modalImgSrc: "" });
-    window.removeEventListener("keydown", this.handleKeyDown);
-  };
-
-  switchKeys = (evt) => {
-    if (evt.key === "Escape") {
-      this.closeModal();
-    } else if (evt.key === "ArrowLeft") {
-      this.setState((prevState) => {
-        const prevIdx =
-          prevState.modalImgIdx === 0
-            ? prevState.images.length - 1
-            : prevState.modalImgIdx - 1;
-        return {
-          modalImgIdx: prevIdx,
-          modalImgSrc: prevState.images[prevIdx].largeImageURL,
-        };
-      });
-    } else if (evt.key === "ArrowRight") {
-      this.setState((prevState) => {
-        const nextIdx =
-          prevState.modalImgIdx === prevState.images.length - 1
-            ? 0
-            : prevState.modalImgIdx + 1;
-        return {
-          modalImgIdx: nextIdx,
-          modalImgSrc: prevState.images[nextIdx].largeImageURL,
-        };
-      });
+  const loadMoreFn = useCallback(() => {
+    if (ableToLoadMore) {
+      // setLoading(true);
+      setPage((prevPage) => prevPage + 1);
     }
+  }, []);
+
+  const getImgSrcForModal = useCallback(
+    (evt) => {
+      const imgSrc = evt.target.src;
+      const modalImgIdx = images.findIndex(
+        (image) => image.largeImageURL === imgSrc
+      );
+      setModalImgSrc(imgSrc);
+      setModalImgIdx(modalImgIdx);
+    },
+    [images]
+  );
+
+  const closeModal = () => {
+    setModalImgSrc("");
   };
 
-  render() {
-    return (
-      <>
-        <Searchbar getImagesByInput={this.getImagesByInput} />
-        {this.state.nothingFound && (
-          <h2 className="NothingFoundTitle">
-            Нажаль, за Вашим запитом нічого не знайдено
-          </h2>
-        )}
-        <ImageGallery
-          images={this.state.images}
-          getImgSrcForModal={this.getImgSrcForModal}
-        />
-        {this.state.images.length === 0 && <Loader />}
-        {this.state.images.length !== 0 && this.state.ableToLoadMore && (
-          <Button loadMoreFn={this.loadMoreFn} />
-        )}
-        {this.state.modalImgSrc.length !== 0 && (
-          <Modal
-            imgSrc={this.state.modalImgSrc}
-            closeModal={this.closeModal}
-            switchKeys={this.switchKeys}
-          />
-        )}
-        {/* {console.log(this.state.startImages)}; */}
-      </>
-    );
-  }
-}
+  const switchKeys = useMemo(
+    () => (evt) => {
+      if (evt.key === "Escape") {
+        closeModal();
+      } else if (evt.key === "ArrowLeft") {
+        setModalImgIdx((prevIdx) =>
+          prevIdx === 0 ? images.length - 1 : prevIdx - 1
+        );
+      } else if (evt.key === "ArrowRight") {
+        setModalImgIdx((prevIdx) =>
+          prevIdx === images.length - 1 ? 0 : prevIdx + 1
+        );
+      }
+    },
+    [images.length]
+  );
+
+  useEffect(() => {
+    if (modalImgSrc) {
+      window.addEventListener("keydown", switchKeys);
+      return () => window.removeEventListener("keydown", switchKeys);
+    }
+  }, [modalImgSrc]);
+
+  useEffect(() => {
+    if (images.length > 0 && modalImgSrc) {
+      setModalImgSrc(images[modalImgIdx]?.largeImageURL);
+    }
+  }, [modalImgIdx, images, modalImgSrc]);
+
+  return (
+    <>
+      <Searchbar getImagesByInput={getImagesByInput} />
+      {nothingFound && (
+        <h2 className="NothingFoundTitle">
+          Нажаль, за Вашим запитом нічого не знайдено
+        </h2>
+      )}
+      <ImageGallery images={images} getImgSrcForModal={getImgSrcForModal} />
+      {images.length === 0 && <Loader />}
+      {images.length !== 0 && ableToLoadMore && (
+        <Button loadMoreFn={loadMoreFn} />
+      )}
+      {modalImgSrc && <Modal imgSrc={modalImgSrc} closeModal={closeModal} />}
+    </>
+  );
+};
 
 export default App;
